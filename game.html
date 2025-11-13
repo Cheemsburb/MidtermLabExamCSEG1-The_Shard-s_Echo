@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Shard's Echo</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .choice-button {
+        @apply bg-gray-700 text-white font-medium py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out;
+        @apply hover:bg-indigo-500 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75;
+      }
+      .pause-button {
+        @apply fixed top-4 right-4 z-50 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-md;
+        @apply hover:bg-gray-700 transition-colors duration-200;
+      }
+      .modal {
+        @apply fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-40;
+      }
+      .modal-content {
+        @apply bg-gray-800 p-8 rounded-lg shadow-2xl text-center;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-900 text-gray-200 h-full flex items-center justify-center p-4"
+  >
+    <!-- 1. Start Menu Screen -->
+    <div id="screen-start" class="text-center">
+      <h1 class="text-5xl font-bold text-white mb-4">The Shard's Echo</h1>
+      <p class="text-xl text-gray-400 mb-8">
+        A story about the decisions that define us.
+      </p>
+      <button id="start-button" class="choice-button text-xl">
+        Begin Your Journey
+      </button>
+    </div>
+
+    <!-- 2. Main Game Screen (hidden by default) -->
+    <div id="screen-game" class="hidden w-full max-w-4xl mx-auto">
+      <!-- Pause Button -->
+      <button id="pause-button" class="pause-button">Pause</button>
+
+      <!-- Visual Area -->
+      <div class="mb-6 bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <img
+          id="scene-image"
+          src="https://placehold.co/1200x600/1a202c/e2e8f0?text=Loading..."
+          alt="Scene visual"
+          class="w-full h-auto object-cover"
+        />
+      </div>
+
+      <!-- Narrative Area -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-xl mb-6 min-h-[150px]">
+        <p id="scene-text" class="text-lg text-gray-300 leading-relaxed"></p>
+      </div>
+
+      <!-- Choice Area -->
+      <div id="choice-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Choice buttons will be injected here by JavaScript -->
+      </div>
+    </div>
+
+    <!-- 3. Pause Menu Modal (hidden by default) -->
+    <div id="modal-pause" class="modal hidden">
+      <div class="modal-content w-full max-w-md">
+        <h2 class="text-3xl font-bold text-white mb-6">Game Paused</h2>
+        <div class="space-y-4">
+          <button id="resume-button" class="choice-button w-full">
+            Resume
+          </button>
+          <button
+            id="restart-button"
+            class="choice-button w-full bg-red-700 hover:bg-red-600"
+          >
+            Restart Game
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. End Screen (will reuse game screen) -->
+    <!-- The end "scenes" will just show a "Play Again" button -->
+
+    <script>
+      let gameState = {};
+
+      const story = {
+        scene1: {
+          visual: "./assets/scene1.jpg",
+          text:
+            "<strong>Elder Maeve (Voice-over, weary):</strong> \"The blight... it's taking her, Warden. Just like it's taking the Weald. She has hours, maybe a day.\"" +
+            '<br><br><strong>You:</strong> "There must be *something* we can do."' +
+            '<br><br><strong>Elder Maeve:</strong> "The legends... they speak of the Heartseed at the center of the Whispering Weald. They say it holds the first light, the cure for any ailment. But the grove is forbidden, Warden. It is a fool\'s errand."' +
+            '<br><br><strong>You:</strong> "If there\'s a chance, I have to take it."' +
+            '<br><br><strong>Elder Maeve:</strong> "Then go. And may the Old Gods... forgive you."',
+          choices: [
+            { text: "Enter the Whispering Weald", nextScene: "scene2" },
+          ],
+        },
+        scene2: {
+          visual: "./assets/scene2.jpg",
+          text: "The path into the Weald splits. To the left, an overgrown trail winds through dark, thorny brush. To the right, a set of faint deer tracks leads into a misty hollow.",
+          choices: [
+            {
+              text: "[Take the Overgrown Trail] It looks more direct.",
+              nextScene: "scene2_continue",
+            },
+            {
+              text: "[Follow the Deer Tracks] The creatures know the safest paths.",
+              nextScene: "scene2_continue",
+            },
+          ],
+        },
+        scene2_continue: {
+          visual: "./assets/scene2continue.jpg",
+          text: "You push forward, the thorns (or mist) clawing at you, but your resolve is firm. The path continues for some time until you spot a structure through the trees.",
+          choices: [
+            { text: "Approach the structure", nextScene: "scene3_outpost" },
+          ],
+        },
+        scene3_outpost: {
+          visual: "./assets/scene3.jpg",
+          text: "You pass the remains of an old watchtower, choked by the blight. It seems to have been an outpost for the Iron Knights, the same order that hunts magic in the Weald. The door is hanging open, beckoning you into its darkness.",
+          choices: [
+            {
+              text: "[Investigate the watchtower]",
+              nextScene: "scene3_outpost_inside",
+            },
+            {
+              text: "[Stay on the path] It's a waste of time.",
+              nextScene: "scene4_knight",
+            },
+          ],
+        },
+        scene3_outpost_inside: {
+          visual: "./assets/scene3OutpostInside.jpg",
+          text: "Inside, a half-burnt map lies on a table. It has notes scrawled on it... 'The Heartseed is a Fable', 'The Spirit is a Deceiver', '...splitting the crystal is the only way...' The rest is illegible.",
+          choices: [
+            {
+              text: "Continue on, new knowledge in hand",
+              nextScene: "scene4_knight",
+              action: "readJournal",
+            },
+          ],
+        },
+        scene4_knight: {
+          visual: "./assets/scene4.jpg",
+          text:
+            "Further on, you find another Iron Knight. In a small clearing, one is slumped against a tree, an arrow in his side. He's clearly dying. His journal has fallen open just out of his reach." +
+            '<br><br><strong>Dying Knight (Gasping):</strong> "Warden... Pfah. Cursed forest... Please... my journal. Read it. My order... must know what I found... before I..."' +
+            "<br><br>(He coughs, a final shudder. He's gone.)" +
+            "<br><br>His final plea hangs in the air. The journal lies open on the forest floor.",
+          choices: [
+            {
+              text: "[Honor his wish] Read the Journal.",
+              nextScene: "scene5_heart",
+              action: "readJournal",
+            },
+            {
+              text: "[Ignore the journal] He was an enemy. Lyra is waiting.",
+              nextScene: "scene5_heart",
+            },
+          ],
+        },
+        scene5_heart: {
+          visual: "./assets/scene5.jpg",
+          text:
+            'You reach the center of the Weald. It\'s a breathtaking, luminous grove, untouched by the blight. In the center floats a glowing crystal, the "Heartseed." As you approach, a Spirit of the Forest, made of light and leaves, appears.' +
+            '<br><br><strong>Forest Spirit:</strong> "You have come. The Healer."' +
+            '<br><br><strong>You:</strong> "My sister is dying. I need the Heartseed to cure her."' +
+            "<br><br><strong>Forest Spirit:</strong> \"This 'Heartseed,' as you call it, is the Shard of the Weald. It is my essence. It is the *only* thing holding the blight at bay. If you take it, your sister will be cured. Instantly. But the Weald... the Weald will die. And once the forest falls, the blight will spread, consuming everything. Your village... the world... in time.\"",
+          onRender: "handleScene5Logic",
+        },
+        scene5_pathA_text: {
+          text: "<br><br><strong>Forest Spirit:</strong> \"The choice is yours, Warden. Your sister's life... or the world's. A life for a life. What will you save?\"",
+          choices: [
+            {
+              text: "[TAKE THE SHARD] \"I'm sorry. I can't lose her.\"",
+              nextScene: "ending1",
+            },
+            {
+              text: '[LEAVE THE SHARD] "I... I can\'t doom the world."',
+              nextScene: "ending2",
+            },
+          ],
+        },
+        scene5_pathB_text: {
+          text:
+            "<br><br><strong>You:</strong> \"What I found... the notes in the tower... the knight's journal... they said the Shard can be split. That I don't have to take it all.\"" +
+            '<br><br><strong>Forest Spirit (Eyes narrow):</strong> "That butcher... Yes, the knowledge is a curse. Splitting the Shard is a great risk. It will shatter my being and wound the Weald, perhaps for centuries. It may not even be enough to save your sister... and it will not be enough to stop the blight *forever*. But it will buy your world... time."',
+          choices: [
+            {
+              text: '[TAKE THE SHARD] "The risk is too great. I need the full cure."',
+              nextScene: "ending1",
+            },
+            {
+              text: '[LEAVE THE SHARD] "I won\'t risk the Weald, or her."',
+              nextScene: "ending2",
+            },
+            {
+              text: '[SPLIT THE SHARD] "I\'ll take the risk. A chance for both."',
+              nextScene: "ending3",
+            },
+          ],
+        },
+        ending1: {
+          visual: "./assets/ending1.jpg",
+          text:
+            "<strong>Narrator:</strong> You saved her. You held her and wept as the light returned to her eyes. But in the silence of the Weald, you hear the world's slow, agonizing death. Your love was a beacon... and a fire that burned the world." +
+            "<br><br><strong>This is the decision that defines you.</strong>",
+          choices: [{ text: "Play Again", nextScene: "start" }],
+        },
+        ending2: {
+          visual: "./assets/ending2.jpg",
+          text:
+            "<strong>Narrator:</strong> You returned with empty hands and a heavy heart. You held her as she faded. But the Weald lives. The blight is held back. The world is safe... for now. Your sacrifice was a terrible burden... and the world's salvation." +
+            "<br><br><strong>This is the decision that defines you.</strong>",
+          choices: [{ text: "Play Again", nextScene: "start" }],
+        },
+        ending3: {
+          visual: "./assets/ending3.jpg",
+          text:
+            "<strong>Narrator:</strong> You chose the path of compromise. The fragment was enough... barely. She lives, but the shadow of the blight never truly left her. The Weald endures, wounded but fighting. You saved nothing... and yet, you saved everything." +
+            "<br><br><strong>This is the decision that defines you.</strong>",
+          choices: [{ text: "Play Again", nextScene: "start" }],
+        },
+      };
+
+      const startScreen = document.getElementById("screen-start");
+      const gameScreen = document.getElementById("screen-game");
+      const startButton = document.getElementById("start-button");
+
+      const sceneImage = document.getElementById("scene-image");
+      const sceneText = document.getElementById("scene-text");
+      const choiceContainer = document.getElementById("choice-container");
+
+      const pauseButton = document.getElementById("pause-button");
+      const pauseModal = document.getElementById("modal-pause");
+      const resumeButton = document.getElementById("resume-button");
+      const restartButton = document.getElementById("restart-button");
+
+      function startGame() {
+        gameState = {
+          readJournal: false,
+        };
+        showScene("scene1");
+        startScreen.classList.add("hidden");
+        gameScreen.classList.remove("hidden");
+        pauseModal.classList.add("hidden");
+      }
+
+      function showScene(sceneId) {
+        if (sceneId === "start") {
+          gameScreen.classList.add("hidden");
+          startScreen.classList.remove("hidden");
+          return;
+        }
+
+        const scene = story[sceneId];
+        if (!scene) {
+          console.error(`Scene "${sceneId}" not found!`);
+          return;
+        }
+
+        sceneImage.src = scene.visual;
+        sceneImage.alt = scene.text.substring(0, 50);
+        sceneText.innerHTML = scene.text;
+
+        while (choiceContainer.firstChild) {
+          choiceContainer.removeChild(choiceContainer.firstChild);
+        }
+
+        if (scene.onRender && scene.onRender === "handleScene5Logic") {
+          handleScene5Logic();
+        } else if (scene.choices) {
+          scene.choices.forEach((choice) => {
+            const button = document.createElement("button");
+            button.innerHTML = choice.text;
+            button.className = "choice-button";
+            button.onclick = () => makeChoice(choice);
+            choiceContainer.appendChild(button);
+          });
+        }
+      }
+
+      function handleScene5Logic() {
+        let path;
+        if (gameState.readJournal) {
+          path = story["scene5_pathB_text"];
+          sceneText.innerHTML += path.text;
+        } else {
+          path = story["scene5_pathA_text"];
+          sceneText.innerHTML += path.text;
+        }
+
+        path.choices.forEach((choice) => {
+          const button = document.createElement("button");
+          button.innerHTML = choice.text;
+          button.className = "choice-button";
+          button.onclick = () => makeChoice(choice);
+          choiceContainer.appendChild(button);
+        });
+      }
+
+      function makeChoice(choice) {
+        if (choice.action === "readJournal") {
+          gameState.readJournal = true;
+        }
+        showScene(choice.nextScene);
+      }
+
+      startButton.onclick = startGame;
+
+      pauseButton.onclick = () => {
+        pauseModal.classList.remove("hidden");
+      };
+
+      resumeButton.onclick = () => {
+        pauseModal.classList.add("hidden");
+      };
+
+      restartButton.onclick = () => {
+        startGame();
+      };
+    </script>
+  </body>
+</html>
